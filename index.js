@@ -27,12 +27,15 @@ module.exports = {
         funcaptchaDataBlob: null,
 
     },
+
     setAPIKey(key) {
         this.settings.clientKey = key;
     },
+
     shutUp() {
         this.settings.isVerbose = false;
     },
+
     getBalance() {
         return new Promise((resolve, reject) => {
             this.JSONRequest('getBalance', {
@@ -42,6 +45,7 @@ module.exports = {
                 .catch(err => reject(err));
         });
     },
+
     solveImage(body) {
         return new Promise((resolve, reject) => {
             this.JSONRequest('createTask', {
@@ -67,6 +71,7 @@ module.exports = {
                 .catch(err => reject(err));
         });
     },
+
     reportIncorrectImageCaptcha() {
         return new Promise((resolve, reject) => {
             this.JSONRequest('reportIncorrectImageCaptcha', {
@@ -145,7 +150,6 @@ module.exports = {
         });
     },
 
-
     solveRecaptchaV3(websiteURL, websiteKey, minScore, pageAction) {
         return new Promise((resolve, reject) => {
             this.JSONRequest('createTask', {
@@ -180,7 +184,6 @@ module.exports = {
         });
     },
 
-
     solveHCaptchaProxyless(websiteURL, websiteKey) {
         return new Promise((resolve, reject) => {
             this.JSONRequest('createTask', {
@@ -201,7 +204,6 @@ module.exports = {
                 .catch(err => reject(err));
         });
     },
-
 
     solveHCaptchaProxyOn(websiteURL,
                             websiteKey,
@@ -242,20 +244,18 @@ module.exports = {
         });
     },
 
-
-
     solveFunCaptchaProxyless(websiteURL, websiteKey) {
         return new Promise((resolve, reject) => {
             this.JSONRequest('createTask', {
                 'clientKey' : this.settings.clientKey,
                 'task' : {
-                    type:                   'FunCaptchaTaskProxyless',
-                    websiteURL:             websiteURL,
-                    websitePublicKey:       websiteKey,
+                    type:                       'FunCaptchaTaskProxyless',
+                    websiteURL:                 websiteURL,
+                    websitePublicKey:           websiteKey,
                     funcaptchaApiJSSubdomain:   this.settings.funcaptchaApiJSSubdomain ? this.settings.funcaptchaApiJSSubdomain : '',
-                    data: this.settings.funcaptchaDataBlob ? JSON.stringify({
-                        blob: this.settings.funcaptchaDataBlob
-                    }) : ''
+                    data:                       this.settings.funcaptchaDataBlob ? JSON.stringify({
+                                                    blob: this.settings.funcaptchaDataBlob
+                                                }) : ''
                 }
 
             })
@@ -269,7 +269,6 @@ module.exports = {
                 .catch(err => reject(err));
         });
     },
-
 
     solveFunCaptchaProxyOn(websiteURL,
                          websiteKey,
@@ -311,8 +310,6 @@ module.exports = {
         });
     },
 
-
-
     solveGeeTestProxyless(websiteURL,
                           gt,
                           challenge,
@@ -341,19 +338,18 @@ module.exports = {
         });
     },
 
-
     solveGeeTestProxyOn(websiteURL,
-                           gt,
-                           challenge,
-                           apiSubdomain,
-                           getLib,
-                           proxyType,
-                           proxyAddress,
-                           proxyPort,
-                           proxyLogin,
-                           proxyPassword,
-                           userAgent,
-                           cookies) {
+                        gt,
+                        challenge,
+                        apiSubdomain,
+                        getLib,
+                        proxyType,
+                        proxyAddress,
+                        proxyPort,
+                        proxyLogin,
+                        proxyPassword,
+                        userAgent,
+                        cookies) {
         return new Promise((resolve, reject) => {
             this.JSONRequest('createTask', {
                 'clientKey' : this.settings.clientKey,
@@ -391,43 +387,48 @@ module.exports = {
     waitForResult(taskId) {
         return new Promise((resolve, reject) => {
 
-            (async () => {
+            if (this.settings.isVerbose) {
+                console.log(`created task with ID ${taskId}`);
+                console.log(`waiting ${this.settings.firstAttemptWaitingInterval} seconds`);
+            }
 
-                if (this.settings.isVerbose) console.log('created task with ID '+taskId);
-                if (this.settings.isVerbose) console.log('waiting '+this.settings.firstAttemptWaitingInterval+' seconds');
-                await this.delay(this.settings.firstAttemptWaitingInterval * 1000);
+            setTimeout(checkForResult, this.settings.firstAttemptWaitingInterval * 1000);
 
-                while (taskId > 0) {
-                    await this.JSONRequest('getTaskResult', {
-                        'clientKey' :   this.settings.clientKey,
-                        'taskId'    :   taskId
-                    })
-                        .then(response => {
-                            if (response.status === 'ready') {
-                                taskId = 0;
-                                resolve(response.solution);
-                            }
-                            if (response.status === 'processing') {
-                                if (this.settings.isVerbose) console.log('captcha result is not yet ready');
-                            }
-                        })
-                        .catch(error => {
-                            taskId = 0;
-                            reject(error);
-                        });
-
-
-                    if (this.settings.isVerbose) console.log('waiting '+this.settings.normalWaitingInterval+' seconds');
-                    await this.delay(this.settings.normalWaitingInterval * 1000);
-
+            function checkForResult() {
+                if (taskId == 0) {
+                    reject(new Error('no task is running'));
+                    return;
                 }
 
-            })();
+                this.JSONRequest('getTaskResult', {
+                    'clientKey' :   this.settings.clientKey,
+                    'taskId'    :   taskId
+                })
+                    .then(response => {
+                        if (response.status === 'ready') {
+                            taskId = 0;
+                            resolve(response.solution);
+                        } else {
+                            if (response.status === 'processing' && this.settings.isVerbose) {
+                                console.log(`captcha result is not yet ready`);
+                            }
 
+                            if (this.settings.isVerbose) {
+                                console.log(`waiting ${this.settings.normalWaitingInterval} seconds`);
+                            }
 
+                            setTimeout(checkForResult, this.settings.normalWaitingInterval * 1000);
+                        }
+
+                    })
+                    .catch(error => {
+                        taskId = 0;
+                        reject(error);
+                    })
+            }
         });
-
     },
+
     JSONRequest(methodName, payLoad) {
         return new Promise((resolve, reject) => {
 
@@ -435,10 +436,10 @@ module.exports = {
                 const message = 'Application should be run either in NodeJs or a WebBrowser environment';
                 console.error(message);
                 reject(message);
+                return;
             }
 
-            const axios = require('axios')
-            axios.post('https://api.anti-captcha.com/' + methodName,
+            require('axios').post(`https://api.anti-captcha.com/${methodName}`,
                 payLoad,
                 {
                     timeout: this.connectionTimeout * 1000,
@@ -453,35 +454,29 @@ module.exports = {
                 .then(data => {
                     resolve(data)
                 })
-                .catch((error) => reject(error))
-
-
+                .catch(error => reject(error))
         });
     },
+
     checkForErrors(response) {
         return new Promise((resolve, reject) => {
-            if (typeof response.errorId === "undefined") {
-                reject("Incorrect API response, something is wrong");
-                return;
+            if (typeof response.errorId === 'undefined') {
+                reject(`Incorrect API response, something is wrong`);
             }
-            if (typeof response.errorId !== "number") {
-                reject("Unknown API error code "+response.errorId);
-                return;
+            else if (typeof response.errorId !== "number") {
+                reject(`Unknown API error code ${response.errorId}`);
             }
-            if (response.errorId > 0) {
-                console.error('Received API error '+response.errorCode+': '+response.errorDescription);
+            else if (response.errorId > 0) {
+                console.error(`Received API error ${response.errorCode}: ${response.errorDescription}`);
                 reject(response.errorCode);
-                return;
             }
-            resolve(response);
+            else {
+                resolve(response);
+            }
         });
     },
+
     getCookies() {
         return this.settings.cookies;
-    },
-    delay(time) {
-        return new Promise(function(resolve) {
-            setTimeout(resolve, time)
-        });
     }
 }
